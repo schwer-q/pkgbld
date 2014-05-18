@@ -1,0 +1,271 @@
+#!/bin/sh -
+#
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+#
+
+: ${ARCH=`uname -p`}
+: ${OPSYS=`uname -s`}
+: ${OSREL=`uname -r | sed -e 's/[-(].*//'`}
+
+: ${PKGBLDDIR="/usr/pkgbld"}
+: ${DISTDIR="${PKGBLDDIR}/distfiles"}
+: ${REPODIR="${PKGBLDDIR}/repo"}
+
+: ${PREFIX="/usr"}
+: ${BINDIR="${PREFIX}/bin"}
+: ${SBINDIR="${PREFIX}/sbin"}
+: ${SYSCONFIGDIR="${PREFIX}/etc"}
+: ${LIBDIR="${PREFIX}/lib"}
+: ${LIBEXECDIR="${PREFIX}/libexec"}
+: ${DATADIR="${PREFIX}/share"}
+: ${DOCDIR="${DATADIR}/doc/${PKGNAME}"}
+: ${MANDIR="${DATADIR}/man"}
+: ${INFODIR="${DATADIR}/info"}
+
+: ${PKGSRC="${PKGNAME}-${PKGVERSION}"}
+
+: ${WRKDIR="${PKGBLDDIR}/work/${PKGNAME}"}
+: ${WRKSRC="${WRKDIR}/${PKGSRC}"}
+: ${WRKBLD="${WRKSRC}"}
+: ${WRKDST="${WRKDIR}/dest"}
+
+: ${FILESDIR="$(pwd)/files"}
+: ${PATCHDIR="$(pwd)/files"}
+
+: ${PKGFILE="${PKGNAME}-${PKGEPOCH:-0}:${PKGVERSION}-${PKGREVISION:-0}.tgz"}
+
+##################################################
+### DOWNLOAD #####################################
+##################################################
+
+: ${FETCH="/usr/bin/fetch"}
+: ${FETCH_ARGS="-Fpr"}
+
+__checksum() {
+    _algo=${ARCHIVE_HASH%:*}
+    _expected=${ARCHIVE_HASH#*:}
+    [ -z "$_algo" -o -z "$_expected" ] && return 0
+    _real=`$_algo -q $ARCHIVE`
+    [ "$_expected" != "$_real" ] && return 1
+    return 0
+}
+
+__download() {
+    [ -f "${WRKDIR}/.__download_done" ]	&& return 0
+    [ "$NO_DOWNLOAD" = "yes" ]		&& return 0
+    [ -d "$WRKDIR" ]  || mkdir -p $WRKDIR
+    [ -d "$DISTDIR" ] || mkdir -p $DISTDIR
+    (
+	cd $DISTDIR
+	_tries=5
+	([ -r $ARCHIVE ] && __checksum) && _status="ok"
+	while [ $_tries -gt 0 -a -z "$_status" ]; do
+	    ${FETCH} ${FETCH_ARGS} -o ${ARCHIVE} ${ARCHIVE_URL}/${ARCHIVE} || :
+	    ([ -r $ARCHIVE ] && __checksum) && _status="ok"
+	    _tries=$(($_tries - 1))
+	done
+	[ -z "$_status" ] && rm -f $ARCHIVE
+    )
+    touch ${WRKDIR}/.__download_done
+    return 0
+}
+
+##################################################
+### EXTRACT ######################################
+##################################################
+
+: ${CAT="/bin/cat"}
+: ${BZIP2="/usr/bin/bzip2"}
+: ${GZIP="/usr/bin/gzip"}
+: ${XZ="/usr/bin/xz"}
+
+__extract() {
+    __download || return 1
+    [ "$NO_EXTRACT" = "yes" ]		&& return 0
+    [ -f "${WRKDIR}/.__extract_done" ]	&& return 0
+    [ -d "$WRKDIR" ] || mkdir -p $WRKDIR
+    for archive in $ARCHIVE $ARCHIVE_EXTRA; do
+	UNCOMPRESS=$CAT
+	case "$archive" in
+	    *.bz2|*.tbz|*.tbz2)	UNCOMPRESS="$BZIP2 -dc"	;;
+	    *.gz|*.tgz)		UNCOMPRESS="$GZIP -dc"	;;
+	    *.xz|*.txz)		UNCOMPRESS="$XZ -dc"	;;
+	esac
+	($UNCOMPRESS ${DISTDIR}/$archive | tar -xf - -C $WRKDIR) || return 1
+    done
+    touch ${WRKDIR}/.__extract_done
+    return 0
+}
+
+##################################################
+### PREP #########################################
+##################################################
+
+: ${PATCH="/usr/bin/patch"}
+: ${PATCH_STRIP="-p0"}
+: ${PATCH_ARGS="-d ${WRKSRC} --forward --quiet -E $PATCH_STRIP"}
+
+__prep() {
+    __download || return 1
+    __extract  || return 1
+    [ -f "${WRKDIR}/.__prep_done" ] && return 0
+    if [ -d "$PATCHDIR" ]; then
+	echo "===> Applying ${OPSYS} patches for ${PKGNAME}..."
+	for _patch in files/patch-*; do
+	    case "$_patch" in
+		*.ignore|*.skip)
+		    echo "===>  Ignoring patchfile $_patch"
+		    ;;
+		*)
+		    echo "===>  Applying ${OPSYS} patchfile ${_patch}..."
+		    if ! $PATCH $PATCH_ARGS < $_patch; then
+			echo -e 'Failed to apply patch ${_patch}.'
+			return 1
+		    fi
+		    ;;
+	    esac
+	done
+    fi
+    (
+	cd $WRKSRC
+	prep
+    ) || return 1
+    touch ${WRKDIR}/.__prep_done
+    return 0
+}
+
+##################################################
+### DEPENDS ######################################
+##################################################
+
+: ${BUILD_DEPENDS=""}
+: ${RUNTIME_DEPENDS=""}
+
+__depends() {
+    _depends_type=$1
+    case "$_depends_type" in
+	'build')	_depends="$BUILD_DEPENDS"			;;
+	'runtime')	_depends="$RUNTIME_DEPENDS"			;;
+	'all')		_depends="$BUILD_DEPENDS $RUNTIME_DEPENDS"	;;
+    esac
+    for _depend in $_depends; do
+	(
+	    cd ${PKGBLDDIR}/${_depend}
+	    ./build package clean install
+	) || return 1
+    done
+    return 0
+}
+
+##################################################
+### BUILD ########################################
+##################################################
+
+: ${CONFIGURE_SCRIPT="configure"}
+: ${CONFIGURE_PREFIX="$PREFIX"}
+
+configure() {
+    if [ "$WRKSRC" = "$WRKBLD" ]; then
+	CONFIGURE_SCRIPT="./$CONFIGURE_SCRIPT"
+    else
+	CONFIGURE_SCRIPT="${WRKSRC}/$CONFIGURE_SCRIPT"
+    fi
+    if [ -n "$CONFIGURE_PREFIX" ]; then
+	CONFIGURE_ARGS="--prefix=$CONFIGURE_PREFIX $CONFIGURE_ARGS"
+    fi
+
+    env "$CONFIGURE_ENV"	\
+    $CONFIGURE_SCRIPT		\
+	"$CONFIGURE_ARGS"
+}
+
+configure_env_add() {
+    CONFIGURE_ENV="$CONFIGURE_ENV $@"
+}
+
+configure_args_add() {
+    CONFIGURE_ARGS="$CONFIGURE_ARGS $@"
+}
+
+__build() {
+    __prep || return 1
+    [ -f "${WRKDIR}/.__build_done" ] && return 0
+    [ -d "$WRKDIR" ] || mkdir -p $WRKDIR
+    (
+	cd $WRKBLD
+	__depends build
+	build
+    ) || return 1
+    touch ${WRKDIR}/.__build_done
+    return 0
+}
+
+##################################################
+### PACKAGE ######################################
+##################################################
+
+__package() {
+    __build || return 1
+    [ -f "${WRKDIR}/.__package_done" ] && return 0
+    [ -d "$WRKDST" ] || mkdir -p $WRKDST
+    (
+	cd $WRKSRC
+	package || return 1
+    )
+    # [ -d "${REPODIR}/All/${PKGNAME}" ] || mkdir -p ${REPODIR}/All/${PKGNAME}
+    [ -d "$REPODIR" ] || mkdir -p $REPODIR
+    [ -d "${WRKDST}/meta" ] || mkdir -p ${WRKDST}/meta
+    (cd $WRKDST && find . | grep -v '^\./meta' | sort) > ${WRKDST}/meta/CONTENT
+    cat > ${WRKDST}/meta/MANIFEST << "_EOF_"
+PKGNAME=$PKGNAME
+PKGVERSION=$PKGVERSION
+PKGREVISION=${PKGREVISION:-0}
+PKGEPOCH=${PKGEPOCH:-0}
+
+CATEGORIES="$CATEGORIES"
+
+DESCRIPTION="$DESCRIPTION"
+_EOF_
+    tar -zcf ${REPODIR}/${PKGFILE} --options gzip:9 -C ${WRKDST} .
+    touch ${WRKDIR}/.__package_done
+    return 0
+}
+
+##################################################
+### CLEAN ########################################
+##################################################
+
+__clean() {
+    rm -rf $WRKDIR
+}
+
+##################################################
+### INSTALL ######################################
+##################################################
+
+__install() {
+    __package || return 1
+    [ -r "${REPODIR}/${PKGFILE}" ] || return 1
+    (
+	__depends runtime
+    ) || return 1
+    tar -xf ${REPODIR}/${PKGFILE} -C /
+    [ -d "/var/pkg" ] || mkdir /var/pkg
+    mv /meta /var/pkg/$PKGNAME
+    return 0
+}
+
+main() {
+    while [ -n "$1" ]; do
+	case "$1" in
+	    'build'|'clean'|'download'|'extract'|'install'|'package'|'prep')
+		__$1
+		;;
+	esac
+	shift
+    done
+    return 0
+}
+
+set -e
