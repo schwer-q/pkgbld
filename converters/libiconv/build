@@ -1,0 +1,31 @@
+#!/bin/sh -
+#
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+#
+
+PKGNAME="libiconv"
+PKGVERSION="1.14"
+
+. ../../common/all.subr
+
+ARCHIVE="${PKGSRC}.tar.gz"
+ARCHIVE_URL="http://ftp.gnu.org/gnu/${PKGNAME}"
+
+prep() {
+    :
+}
+
+build() {
+    configure_args_add --enable-static
+    configure_args_add --docdir=$DOCDIR
+
+    configure
+    make
+}
+
+package() {
+    make install DESTDIR=$WRKDST
+}
+
+main $@
