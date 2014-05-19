@@ -19,6 +19,7 @@ prep() {
 }
 
 build() {
+    CONFIGURE="gnu"
     configure_env_add  MAKEINFO=\"makeinfo --no-split\"
     configure_args_add --program-prefix=g
     configure_args_add --without-libsigsegv-prefix

@@ -17,6 +17,7 @@ prep() {
 }
 
 build() {
+    CONFIGURE="gnu"
     configure_args_add --enable-static
     configure_args_add --docdir=$DOCDIR
 
