@@ -175,17 +175,25 @@ configure() {
 	CONFIGURE_ARGS="--prefix=$CONFIGURE_PREFIX $CONFIGURE_ARGS"
     fi
 
-    env "$CONFIGURE_ENV"	\
-    $CONFIGURE_SCRIPT		\
-	"$CONFIGURE_ARGS"
+    (
+	touch ${WRKDIR}/configure.env
+	while read var; do
+	    eval   "${var}"
+	    export "${var%%=*}"
+	done < ${WRKDIR}/configure.env
+	rm -f ${WRKDIR}/configure.env
+
+	$CONFIGURE_SCRIPT		\
+	    $CONFIGURE_ARGS
+    )
 }
 
 configure_env_add() {
-    CONFIGURE_ENV="$CONFIGURE_ENV $@"
+    echo "$*" >> ${WRKDIR}/configure.env
 }
 
 configure_args_add() {
-    CONFIGURE_ARGS="$CONFIGURE_ARGS $@"
+    CONFIGURE_ARGS="$CONFIGURE_ARGS $*"
 }
 
 __build() {
