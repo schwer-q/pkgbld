@@ -1,0 +1,37 @@
+#!/bin/sh -
+#
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+#
+
+PKGNAME="gm4"
+PKGVERSION="1.4.17"
+
+PKGSRC="m4-${PKGVERSION}"
+
+. ../../common/all.subr
+
+ARCHIVE="${PKGSRC}.tar.gz"
+ARCHIVE_URL="http://ftp.gnu.org/gnu/m4"
+
+prep() {
+    :
+}
+
+build() {
+    configure_env_add  MAKEINFO=\"makeinfo --no-split\"
+    configure_args_add --program-prefix=g
+    configure_args_add --without-libsigsegv-prefix
+
+    configure
+    make
+}
+
+package() {
+    make install DESTDIR=$WRKDST
+    EXAMPLEDIR="${DATADIR}/examples/${PKGNAME}"
+    mkdir -p ${WRKDST}/${EXAMPLEDIR}
+    cp ${WRKSRC}/examples/*.m4 ${WRKDST}/${EXAMPLEDIR}
+}
+
+main $@
