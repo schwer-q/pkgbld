@@ -1,0 +1,64 @@
+#!/bin/sh -
+#
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+#
+
+PKGNAME="perl"
+PKGVERSION="5.16.3"
+
+. ../../common/all.subr
+
+ARCHIVE="${PKGSRC}.tar.bz2"
+ARCHIVE_URL="http://www.cpan.org/src/5.0"
+
+prep() {
+    sed -i'.bak' -e 's|%%PTHREAD_LIBS%%|-pthread|g;' \
+	-e 's|%%PTHREAD_CFLAGS%%||g;' \
+	${WRKSRC}/hints/freebsd.sh
+
+}
+
+build() {
+    LOCALE_CLEANUP="LANG= LC_ALL= LC_COLLATE= LC_CTYPE= LC_MESSAGES="
+    LOCALE_CLEANUP="$LOCALE_CLEANUP LC_MONETARY= LC_NUMERIC= LC_TIME="
+    CC=cc
+
+    CONFIGURE_SCRIPT="Configure"
+
+    for i in $LOCALE_CLEANUP; do
+	configure_env_add $i
+    done
+    configure_env_add  UNAME_v=\"`uname -v | sed 'y/=/ /'`\"
+    configure_args_add -des
+    configure_args_add -Darchlib=${LIBDIR}/perl5/${PKGVERSION%.*}/${ARCH}
+    configure_args_add -Dprivlib=${LIBDIR}/perl5/${PKGVERSION%.*}
+    configure_args_add -Dman1dir=${MANDIR}/man1
+    configure_args_add -Dman3dir=${MANDIR}/man3
+    configure_args_add -Dsitearch=${LIBDIR}/perl5/site_perl/${PKGVERSION%.*}/${ARCH}
+    configure_args_add -Dsitelib=${LIBDIR}/perl5/site_perl/${PKGVERSION%.*}
+    configure_args_add -Dsiteman1dir=${MANDIR}/man1
+    configure_args_add -Dsiteman3dir=${MANDIR}/man3
+    configure_args_add -Ui_malloc
+    configure_args_add -Ui_iconv
+    configure_args_add -Uinstallusrbinperl
+    configure_args_add -Dcc="$CC"
+    configure_args_add -Duseshrplib
+    configure_args_add -Dinc_version_list=none
+    configure_args_add -Dccflags=-DAPPLLIB_EXP='\\\"'${LIBDIR}/perl5/${PKGVERSION%.*}/BSDPAN'\\\"'
+    configure_args_add -Doptimize='\"-O2 -pipe -fno-strict-aliasing\"'
+    configure_args_add -Ui_gdbm
+    configure_args_add -Dusethreads=y
+    configure_args_add -Dusemymalloc=n
+    configure_args_add -Duse64bitint
+
+    configure
+    env $LOCALE_CLEANUP \
+    make
+}
+
+package() {
+    make install DESTDIR=$WRKDST
+}
+
+main $@
