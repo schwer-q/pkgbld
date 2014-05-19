@@ -162,6 +162,7 @@ __depends() {
 ### BUILD ########################################
 ##################################################
 
+: ${CONFIGURE=""}
 : ${CONFIGURE_SCRIPT="configure"}
 : ${CONFIGURE_PREFIX="$PREFIX"}
 
@@ -171,21 +172,30 @@ configure() {
     else
 	CONFIGURE_SCRIPT="${WRKSRC}/$CONFIGURE_SCRIPT"
     fi
-    if [ -n "$CONFIGURE_PREFIX" ]; then
-	CONFIGURE_ARGS="--prefix=$CONFIGURE_PREFIX $CONFIGURE_ARGS"
-    fi
 
-    (
-	touch ${WRKDIR}/configure.env
+    printf '#!/bin/sh -\n\n' > ${WRKDIR}/configure
+    if [ -r "${WRKDIR}/configure.env" ]; then
 	while read var; do
-	    eval   "${var}"
-	    export "${var%%=*}"
+	    printf 'export %s\n' "$var" >> ${WRKDIR}/configure
 	done < ${WRKDIR}/configure.env
-	rm -f ${WRKDIR}/configure.env
+	echo '' >> ${WRKDIR}/configure
+    fi
+    printf 'exec %s \\\n' $CONFIGURE_SCRIPT >> ${WRKDIR}/configure
+    case "$CONFIGURE" in
+	[Gg][Nn][Uu])
+	    printf '\t--prefix=%s \\\n' "$CONFIGURE_PREFIX" >> ${WRKDIR}/configure
+	    ;;
+    esac
+    while read arg; do
+	printf '\t%s \\\n' "$arg" >> ${WRKDIR}/configure
+    done < ${WRKDIR}/configure.args
+    printf "\n" >> ${WRKDIR}/configure
+    chmod +x ${WRKDIR}/configure
 
-	$CONFIGURE_SCRIPT		\
-	    $CONFIGURE_ARGS
-    )
+    rm -f ${WRKDIR}/configure.env
+    rm -f ${WRKDIR}/configure.args
+
+    ${WRKDIR}/configure
 }
 
 configure_env_add() {
@@ -193,7 +203,7 @@ configure_env_add() {
 }
 
 configure_args_add() {
-    CONFIGURE_ARGS="$CONFIGURE_ARGS $*"
+    echo "$*" >> ${WRKDIR}/configure.args
 }
 
 __build() {
