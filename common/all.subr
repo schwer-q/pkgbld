@@ -152,8 +152,12 @@ __depends() {
     esac
     for _depend in $_depends; do
 	(
+	    _cookie=$(echo "/tmp/pkgbld/depends/${_depend}.done" | tr '/' '.')
+	    mkdir -p `dirname $_cookie`
+	    [ -f "$_cookie" ] && continue
 	    cd ${PKGBLDDIR}/${_depend}
-	    ./build package clean install
+	    ./build package clean install DEPS=yes
+	    touch $_cookie
 	) || return 1
     done
     return 0
@@ -255,6 +259,9 @@ DESCRIPTION=\"$DESCRIPTION\"" > ${WRKDST}/meta/MANIFEST
 
 __clean() {
     rm -rf $WRKDIR
+    if [ "$DEPS" != "yes" ]; then
+	rm -rf /tmp/pkgbld
+    fi
 }
 
 ##################################################
@@ -268,16 +275,19 @@ __install() {
 	__depends runtime
     ) || return 1
     tar -xf ${REPODIR}/${PKGFILE} -C /
-    [ -d "/var/pkg" ] || mkdir /var/pkg
+    [ -d "/var/pkg" ] || mkdir -p /var/pkg
     mv /meta /var/pkg/$PKGNAME
     return 0
 }
 
 main() {
-    while [ -n "$1" ]; do
+    for i in $*; do
 	case "$1" in
 	    'build'|'clean'|'download'|'extract'|'install'|'package'|'prep')
 		__$1
+		;;
+	    *=*)
+		eval "$i"
 		;;
 	esac
 	shift
