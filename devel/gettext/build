@@ -1,0 +1,46 @@
+#!/bin/sh -
+#
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+#
+
+PKGNAME="gettext"
+PKGVERSION="0.18.3.1"
+
+. ../../common/all.subr
+
+ARCHIVE="${PKGSRC}.tar.gz"
+ARCHIVE_URL="http://ftp.gnu.org/gnu/${PKGNAME}"
+
+BUILD_DEPENDS="
+converters/libiconv
+"
+
+prep() {
+    :
+}
+
+build() {
+    CONFIGURE="gnu"
+    configure_args_add --disable-csharp
+    configure_args_add --disable-java
+    configure_args_add --disable-openmp
+    configure_args_add --disable-threads
+    configure_args_add --with-included-gettext
+    configure_args_add --with-included-glib
+    configure_args_add --with-included-libcroco
+    configure_args_add --with-included-libunistring
+    configure_args_add --with-included-libxml
+    configure_args_add --with-libiconv-prefix=/usr
+    configure_args_add --without-emacs
+    configure_args_add --without-git
+
+    configure
+    make
+}
+
+package() {
+    make install DESTDIR=$WRKDST
+}
+
+main $@
