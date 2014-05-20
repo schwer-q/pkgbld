@@ -1,0 +1,39 @@
+#!/bin/sh -
+#
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+#
+
+PKGNAME="gmake"
+PKGVERSION="3.82"
+
+PKGSRC="make-${PKGVERSION}"
+
+. ../../common/all.subr
+
+ARCHIVE="${PKGSRC}.tar.bz2"
+ARCHIVE_URL="http://ftp.gnu.org/gnu/make"
+
+BUILD_DEPENDS="
+converters/libiconv
+devel/gettext
+"
+
+prep() {
+    :
+}
+
+build() {
+    CONFIGURE="gnu"
+    configure_env_add  MAKEINFO=\"makeinfo --no-split\"
+    configure_args_add --program-prefix=g
+
+    configure
+    make
+}
+
+package() {
+    make install DESTDIR=$WRKDST
+}
+
+main $@
