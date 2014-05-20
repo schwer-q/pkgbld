@@ -92,6 +92,7 @@ __extract() {
 	    *.gz|*.tgz)		UNCOMPRESS="$GZIP -dc"	;;
 	    *.xz|*.txz)		UNCOMPRESS="$XZ -dc"	;;
 	esac
+	echo "===> Extracting ${archive}..."
 	($UNCOMPRESS ${DISTDIR}/$archive | tar -xf - -C $WRKDIR) || return 1
     done
     touch ${WRKDIR}/.__extract_done
@@ -235,16 +236,14 @@ __package() {
     [ -d "$REPODIR" ] || mkdir -p $REPODIR
     [ -d "${WRKDST}/meta" ] || mkdir -p ${WRKDST}/meta
     (cd $WRKDST && find . | grep -v '^\./meta' | sort) > ${WRKDST}/meta/CONTENT
-    cat > ${WRKDST}/meta/MANIFEST << "_EOF_"
-PKGNAME=$PKGNAME
+    echo "PKGNAME=$PKGNAME
 PKGVERSION=$PKGVERSION
 PKGREVISION=${PKGREVISION:-0}
 PKGEPOCH=${PKGEPOCH:-0}
 
-CATEGORIES="$CATEGORIES"
+CATEGORIES=\"$CATEGORIES\"
 
-DESCRIPTION="$DESCRIPTION"
-_EOF_
+DESCRIPTION=\"$DESCRIPTION\"" > ${WRKDST}/meta/MANIFEST
     tar -zcf ${REPODIR}/${PKGFILE} --options gzip:9 -C ${WRKDST} .
     touch ${WRKDIR}/.__package_done
     return 0
