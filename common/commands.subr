@@ -1,0 +1,23 @@
+#!/bin/sh -
+#
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+#
+
+: ${BZIP2="/usr/bin/bzip2"}
+: ${CAT="/bin/cat"}
+: ${GZIP="/usr/bin/gzip"}
+: ${MKDIR="/bin/mkdir -p"}
+: ${RM="/bin/rm -f"}
+: ${SED="/usr/bin/sed"}
+: ${TAR="/usr/bin/tar"}
+: ${TOUCH="/usr/bin/touch"}
+: ${XZ="/usr/bin/xz"}
+: ${PATCH="/usr/bin/patch"}
+: ${REALPATH="/bin/realpath"}
+
+: ${CC="/usr/bin/cc"}
+: ${CPP="/usr/bin/cpp"}
+: ${CXX="/usr/bin/c++"}
+: ${GMAKE="/usr/bin/gmake"}
+: ${MAKE="/usr/bin/make"}
