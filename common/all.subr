@@ -9,6 +9,7 @@
 : ${OSREL=`uname -r | sed -e 's/[-(].*//'`}
 
 : ${PKGBLDDIR="/usr/pkgbld"}
+: ${COMMONDIR="${PKGBLDDIR}/common"}
 : ${DISTDIR="${PKGBLDDIR}/distfiles"}
 : ${REPODIR="${PKGBLDDIR}/repo"}
 
@@ -35,6 +36,7 @@
 
 : ${PKGFILE="${PKGNAME}-${PKGEPOCH:-0}:${PKGVERSION}-${PKGREVISION:-0}.tgz"}
 
+
 ##################################################
 ### DOWNLOAD #####################################
 ##################################################
@@ -42,32 +44,100 @@
 : ${FETCH="/usr/bin/fetch"}
 : ${FETCH_ARGS="-Fpr"}
 
-__checksum() {
-    _algo=${ARCHIVE_HASH%:*}
-    _expected=${ARCHIVE_HASH#*:}
-    [ -z "$_algo" -o -z "$_expected" ] && return 0
-    _real=`$_algo -q $ARCHIVE`
-    [ "$_expected" != "$_real" ] && return 1
+# __checksum() {
+#     _algo=${ARCHIVE_HASH%:*}
+#     _expected=${ARCHIVE_HASH#*:}
+#     [ -z "$_algo" -o -z "$_expected" ] && return 0
+#     _real=`$_algo -q $ARCHIVE`
+#     [ "$_expected" != "$_real" ] && return 1
+#     return 0
+# }
+
+# __download() {
+#     _dcookie="${WRKDIR}/.__download_done"
+
+#     [ -f "$_dcookie" ]		&& return 0
+#     [ "$NO_DOWNLOAD" = "yes" ]	&& return 0
+#     [ -d "$WRKDIR" ]		|| $MKDIR $WRKDIR
+#     [ -d "$DISTDIR" ]		|| $MKDIR $DISTDIR
+
+#     (
+# 	cd $DISTDIR
+# 	_tries=5
+# 	([ -r $ARCHIVE ] && __checksum) && _status="ok"
+# 	while [ $_tries -gt 0 -a -z "$_status" ]; do
+# 	    ${FETCH} ${FETCH_ARGS} -o ${ARCHIVE} ${ARCHIVE_URL}/${ARCHIVE} || :
+# 	    ([ -r $ARCHIVE ] && __checksum) && _status="ok"
+# 	    _tries=$(($_tries - 1))
+# 	done
+# 	[ -z "$_status" ] && rm -f $ARCHIVE
+#     )
+
+#     $TOUCH $_dcookie
+#     return 0
+# }
+
+__download() {
+    _dcookie="${WRKDIR}/.__download_done"
+
+    [ -d "$WRKDIR" ]	       || $MKDIR $WRKDIR
+    [ -d "$DISTDIR" ]	       || $MKDIR $DISTDIR
+    [ -f "$_dcookie" ]	       && return 0
+    [ "$NO_DOWNLOAD" = "yes" ] && return 0
+
+    if [ ! -w "$DISTDIR" ]; then
+	echo "=> You cannot write into ${DISTDIR}; cannot download."
+	__cleanup
+	exit 1
+    fi
+    DISTFILES="$ARCHIVE $ARCHIVE_EXTRA $PATCHFILES $DISTFILES_EXTRA"
+    _DISTDIR=`${REALPATH} ${DISTDIR}/${DISTSUBDIR}`
+    [ -n "$_DISTDIR" -a ! -d "$_DISTDIR" ] && $MKDIR $_DISTDIR
+    for file in $DISTFILES; do
+	(
+	    cd $_DISTDIR
+	    ${FETCH} ${FETCH_ARGS} -o ${file} ${ARCHIVE_URL}/${file}
+	)
+	if [ $? -ne 0 ]; then
+	    echo "=> Couldn't download $file"
+	fi
+    done
+
+    $TOUCH $_dcookie
     return 0
 }
 
-__download() {
-    [ -f "${WRKDIR}/.__download_done" ]	&& return 0
-    [ "$NO_DOWNLOAD" = "yes" ]		&& return 0
-    [ -d "$WRKDIR" ]  || mkdir -p $WRKDIR
-    [ -d "$DISTDIR" ] || mkdir -p $DISTDIR
-    (
-	cd $DISTDIR
-	_tries=5
-	([ -r $ARCHIVE ] && __checksum) && _status="ok"
-	while [ $_tries -gt 0 -a -z "$_status" ]; do
-	    ${FETCH} ${FETCH_ARGS} -o ${ARCHIVE} ${ARCHIVE_URL}/${ARCHIVE} || :
-	    ([ -r $ARCHIVE ] && __checksum) && _status="ok"
-	    _tries=$(($_tries - 1))
-	done
-	[ -z "$_status" ] && rm -f $ARCHIVE
-    )
-    touch ${WRKDIR}/.__download_done
+##################################################
+### CHECKSUM #####################################
+##################################################
+
+__checksum() {
+    DISTFILES="$ARCHIVE $ARCHIVE_EXTRA $PATCHFILES $DISTFILES_EXTRA"
+    _DISTDIR=`${REALPATH} ${DISTDIR}/${DISTSUBDIR}`
+    [ -n "$_DISTDIR" -a ! -d "$_DISTDIR" ] && $MKDIR $_DISTDIR
+    status=0
+    for file in $DISTFILES; do
+	eval tmp=\$${file}_HASH
+	eval ALGEXE=${tmp%:*}
+	ALGO=`echo ${tmp%:*} | tr [[:lower:]] [[:upper:]]`
+	HASHEXP=${tmp#*:}
+	if [ -z "$ALGO" -o -z "$ALGEXE" -o "$HASHEXP" ]; then
+	    echo "=> No checksum for ${file}."
+	    continue
+	fi
+	HASH=`cd $_DISTDIR && $ALGEXE -q $file`
+	if [ "$HASH" != "$HASHEXP" ]; then
+	    echo "=> ${ALGO} checksum mismatch for ${file}."
+	    $RM $file
+	    status=$(($status + 1))
+	else
+	    echo "=> ${ALGO} checksum ok for ${file}."
+	fi
+    done
+    if [ $status -gt 0 ]; then
+	echo "=> $status checksum mismatch."
+	return 1
+    fi
     return 0
 }
 
@@ -75,27 +145,31 @@ __download() {
 ### EXTRACT ######################################
 ##################################################
 
-: ${CAT="/bin/cat"}
-: ${BZIP2="/usr/bin/bzip2"}
-: ${GZIP="/usr/bin/gzip"}
-: ${XZ="/usr/bin/xz"}
-
 __extract() {
-    __download || return 1
-    [ "$NO_EXTRACT" = "yes" ]		&& return 0
-    [ -f "${WRKDIR}/.__extract_done" ]	&& return 0
-    [ -d "$WRKDIR" ] || mkdir -p $WRKDIR
+    _dcookie="${WRKDIR}/.__extract_done"
+    __download
+
+    [ "$NO_EXTRACT" = "yes" ]	&& return 0
+    [ -f "$_dcookie" ]		&& return 0
+    [ -d "$WRKDIR" ]		|| $MKDIR $WRKDIR
+
     for archive in $ARCHIVE $ARCHIVE_EXTRA; do
 	UNCOMPRESS=$CAT
+	UNPACK="| $TAR -xf - -C $WRKDIR"
 	case "$archive" in
 	    *.bz2|*.tbz|*.tbz2)	UNCOMPRESS="$BZIP2 -dc"	;;
 	    *.gz|*.tgz)		UNCOMPRESS="$GZIP -dc"	;;
 	    *.xz|*.txz)		UNCOMPRESS="$XZ -dc"	;;
 	esac
 	echo "===> Extracting ${archive}..."
-	($UNCOMPRESS ${DISTDIR}/$archive | tar -xf - -C $WRKDIR) || return 1
+	($UNCOMPRESS ${DISTDIR}/$archive $UNPACK)
+	if [ $? -ne 0 ]; then
+	    __cleanup
+	    exit 1
+	fi
     done
-    touch ${WRKDIR}/.__extract_done
+
+    $TOUCH $_dcookie
     return 0
 }
 
@@ -103,26 +177,47 @@ __extract() {
 ### PREP #########################################
 ##################################################
 
-: ${PATCH="/usr/bin/patch"}
+: ${DISTORIG=".bak.orig"}
 : ${PATCH_STRIP="-p0"}
 : ${PATCH_ARGS="-d ${WRKSRC} --forward --quiet -E $PATCH_STRIP"}
 
 __prep() {
-    __download || return 1
-    __extract  || return 1
-    [ -f "${WRKDIR}/.__prep_done" ] && return 0
+    _dcookie="${WRKDIR}/.__prep_done"
+    __download
+    __extract
+
+    [ -f "$_dcookie" ] && return 0
+    if [ -n "$PATCHFILES" ]; then
+	echo "===> Applying distribution patches for ${PKGNAME}..."
+	for patch in $PATCHFILES; do
+	    case $patch in
+		*.gz)	$GZIP  -dc $patch ;;
+		*.bz2)	$BZIP2 -dc $patch ;;
+		*.xz)	$XZ    -dc $patch ;;
+		*)	$CAT	   $patch ;;
+	    esac | $PATCH $PATCH_ARGS
+	    if [ $? -ne 0 ]; then
+		echo -e 'Failed to apply patch ${patch}.'
+		__cleanup
+		exit 1
+	    fi
+	done
+    fi
+
     if [ -d "$PATCHDIR" ]; then
 	echo "===> Applying ${OPSYS} patches for ${PKGNAME}..."
-	for _patch in files/patch-*; do
-	    case "$_patch" in
+	for patch in files/patch-*; do
+	    case "$patch" in
 		*.ignore|*.skip)
 		    echo "===>  Ignoring patchfile $_patch"
 		    ;;
 		*)
 		    echo "===>  Applying ${OPSYS} patchfile ${_patch}..."
-		    if ! $PATCH $PATCH_ARGS < $_patch; then
-			echo -e 'Failed to apply patch ${_patch}.'
-			return 1
+		    $CAT $patch | $PATCH $PATCH_ARGS
+		    if [ $? -ne 0 ]; then
+			echo -e 'Failed to apply patch ${patch}.'
+			__cleanup
+			exit 1
 		    fi
 		    ;;
 	    esac
@@ -131,7 +226,11 @@ __prep() {
     (
 	cd $WRKSRC
 	prep
-    ) || return 1
+    )
+    if [ $? -ne 0 ]; then
+	__cleanup
+	exit 1
+    fi
     touch ${WRKDIR}/.__prep_done
     return 0
 }
@@ -151,6 +250,7 @@ __depends() {
 	'all')		_depends="$BUILD_DEPENDS $RUNTIME_DEPENDS"	;;
     esac
     for _depend in $_depends; do
+	echo "=> ${PKGNAME} depends on ${_depends}..."
 	(
 	    _cookie=$(echo "/tmp/pkgbld/depends/${_depend}.done" | tr '/' '.')
 	    mkdir -p `dirname $_cookie`
@@ -257,11 +357,32 @@ DESCRIPTION=\"$DESCRIPTION\"" > ${WRKDST}/meta/MANIFEST
 ### CLEAN ########################################
 ##################################################
 
+: ${CLEANUP_FILE="${TMPDIR}/pkgbld_cleanup"}
+
+__cleanup() {
+    [ "$DEPS" = "yes" ] && return 0
+    $CLEANUP_FILE
+    $RM $CLEANUP_FILE
+    return 0
+}
+
+__cleanup_init() {
+    [ "$DEPS" = "yes" ] && return 0
+    cat > $CLEANUP_FILE << "EOF"
+#!/bin/sh -
+#
+# Automatically generated by pkgbld.
+# DO NOT EDIT!!!
+#
+
+EOF
+    chmod +x $CLEANUP_FILE
+    printf 'rm -rf %s/pkgbld' $TMPDIR >> $CLEANUP_FILE
+    return 0
+}
+
 __clean() {
     rm -rf $WRKDIR
-    if [ "$DEPS" != "yes" ]; then
-	rm -rf /tmp/pkgbld
-    fi
 }
 
 ##################################################
@@ -280,11 +401,15 @@ __install() {
     return 0
 }
 
+##################################################
+### MAIN #########################################
+##################################################
+
 main() {
     for i in $*; do
 	case "$1" in
 	    'build'|'clean'|'download'|'extract'|'install'|'package'|'prep')
-		__$1
+		_func="$_func $1"
 		;;
 	    *=*)
 		eval "$i"
@@ -292,6 +417,11 @@ main() {
 	esac
 	shift
     done
+    __cleanup_init
+    for func in $_func; do
+	__$func
+    done
+    __cleanup
     return 0
 }
 
