@@ -7,7 +7,7 @@
 PKGNAME="perl"
 PKGVERSION="5.16.3"
 
-. ../../common/all.subr
+. ../../common/pkgbld.subr
 
 ARCHIVE="${PKGSRC}.tar.bz2"
 ARCHIVE_URL="http://www.cpan.org/src/5.0"

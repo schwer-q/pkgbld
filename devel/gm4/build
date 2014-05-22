@@ -9,7 +9,7 @@ PKGVERSION="1.4.17"
 
 PKGSRC="m4-${PKGVERSION}"
 
-. ../../common/all.subr
+. ../../common/pkgbld.subr
 
 ARCHIVE="${PKGSRC}.tar.gz"
 ARCHIVE_URL="http://ftp.gnu.org/gnu/m4"

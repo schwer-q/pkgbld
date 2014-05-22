@@ -7,7 +7,7 @@
 PKGNAME="gettext"
 PKGVERSION="0.18.3.1"
 
-. ../../common/all.subr
+. ../../common/pkgbld.subr
 
 ARCHIVE="${PKGSRC}.tar.gz"
 ARCHIVE_URL="http://ftp.gnu.org/gnu/${PKGNAME}"

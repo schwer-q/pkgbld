@@ -7,7 +7,7 @@
 PKGNAME="libiconv"
 PKGVERSION="1.14"
 
-. ../../common/all.subr
+. ../../common/pkgbld.subr
 
 ARCHIVE="${PKGSRC}.tar.gz"
 ARCHIVE_URL="http://ftp.gnu.org/gnu/${PKGNAME}"
