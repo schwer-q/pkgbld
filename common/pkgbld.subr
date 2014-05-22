@@ -23,6 +23,7 @@
 : ${DOCDIR="${DATADIR}/doc/${PKGNAME}"}
 : ${MANDIR="${DATADIR}/man"}
 : ${INFODIR="${DATADIR}/info"}
+: ${TMPDIR="/tmp"}
 
 : ${PKGSRC="${PKGNAME}-${PKGVERSION}"}
 
@@ -36,6 +37,7 @@
 
 : ${PKGFILE="${PKGNAME}-${PKGEPOCH:-0}:${PKGVERSION}-${PKGREVISION:-0}.tgz"}
 
+. ${COMMONDIR}/commands.subr
 
 ##################################################
 ### DOWNLOAD #####################################
@@ -155,14 +157,14 @@ __extract() {
 
     for archive in $ARCHIVE $ARCHIVE_EXTRA; do
 	UNCOMPRESS=$CAT
-	UNPACK="| $TAR -xf - -C $WRKDIR"
+	UNPACK="$TAR -xf - -C $WRKDIR"
 	case "$archive" in
 	    *.bz2|*.tbz|*.tbz2)	UNCOMPRESS="$BZIP2 -dc"	;;
 	    *.gz|*.tgz)		UNCOMPRESS="$GZIP -dc"	;;
 	    *.xz|*.txz)		UNCOMPRESS="$XZ -dc"	;;
 	esac
 	echo "===> Extracting ${archive}..."
-	($UNCOMPRESS ${DISTDIR}/$archive $UNPACK)
+	($UNCOMPRESS ${DISTDIR}/$archive | $UNPACK)
 	if [ $? -ne 0 ]; then
 	    __cleanup
 	    exit 1
