@@ -8,13 +8,13 @@
 : ${CAT="/bin/cat"}
 : ${GZIP="/usr/bin/gzip"}
 : ${MKDIR="/bin/mkdir -p"}
+: ${PATCH="/usr/bin/patch"}
+: ${REALPATH="/bin/realpath"}
 : ${RM="/bin/rm -f"}
 : ${SED="/usr/bin/sed"}
 : ${TAR="/usr/bin/tar"}
 : ${TOUCH="/usr/bin/touch"}
 : ${XZ="/usr/bin/xz"}
-: ${PATCH="/usr/bin/patch"}
-: ${REALPATH="/bin/realpath"}
 
 : ${CC="/usr/bin/cc"}
 : ${CPP="/usr/bin/cpp"}
