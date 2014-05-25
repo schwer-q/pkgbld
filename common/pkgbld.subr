@@ -102,6 +102,7 @@ __download() {
 	)
 	if [ $? -ne 0 ]; then
 	    echo "=> Couldn't download $file"
+	    exit 1
 	fi
     done
 
@@ -186,6 +187,7 @@ __extract() {
 __prep() {
     _dcookie="${WRKDIR}/.__prep_done"
     __download
+    __checksum
     __extract
 
     [ -f "$_dcookie" ] && return 0
@@ -252,7 +254,7 @@ __depends() {
 	'all')		_depends="$BUILD_DEPENDS $RUNTIME_DEPENDS"	;;
     esac
     for _depend in $_depends; do
-	echo "=> ${PKGNAME} depends on ${_depends}..."
+	echo "=> ${PKGNAME} depends on ${_depend}..."
 	(
 	    _cookie=$(echo "/tmp/pkgbld/depends/${_depend}.done" | tr '/' '.')
 	    mkdir -p `dirname $_cookie`
