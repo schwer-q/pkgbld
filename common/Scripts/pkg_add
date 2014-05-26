@@ -1,0 +1,24 @@
+#!/bin/sh -
+# 
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+# 
+
+main() {
+    FILENAME="$1"
+    ROOT="${2:-/}"
+    FILENAME=`realpath $FILENAME`
+
+    cd $ROOT
+    echo "===> Unpacking package..."
+    tar -xf $FILENAME
+    . ./meta/MANIFEST
+    echo "===> Registering ${PKGNAME}..."
+    mkdir -p var/pkg
+    mv ./meta var/pkg/$PKGNAME
+    echo "=> DONE!"
+}
+
+set -e
+
+main "$*"
