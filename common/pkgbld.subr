@@ -61,12 +61,14 @@ __download() {
 	exit 1
     fi
     DISTFILES="$ARCHIVE $ARCHIVE_EXTRA $PATCHFILES $DISTFILES_EXTRA"
-    _DISTDIR=`${REALPATH} ${DISTDIR}/${DISTSUBDIR}`
+    _DISTDIR="${DISTDIR}/${DISTSUBDIR}"
     [ -n "$_DISTDIR" -a ! -d "$_DISTDIR" ] && $MKDIR $_DISTDIR
     for file in $DISTFILES; do
 	(
+	    eval FETCH_URL=${file}_URL
+	    [ -z "$FETCH_URL" ] && FETCH_URL="$ARCHIVE_URL"
 	    cd $_DISTDIR
-	    ${FETCH} ${FETCH_ARGS} -o ${file} ${ARCHIVE_URL}/${file}
+	    ${FETCH} ${FETCH_ARGS} -o ${file} ${FETCH_URL}/${file}
 	)
 	if [ $? -ne 0 ]; then
 	    echo "=> Couldn't download $file"
