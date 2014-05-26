@@ -1,0 +1,15 @@
+#!/bin/sh -
+# 
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+# 
+
+main() {
+    ROOT="${1:-/}"
+    PKG="$2"
+    
+    cd $ROOT
+    ls ./var/pkg | sort | grep "$PKG"
+}
+
+main "$*"
