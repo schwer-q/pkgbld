@@ -12,6 +12,7 @@
 : ${COMMONDIR="${PKGBLDDIR}/common"}
 : ${DISTDIR="${PKGBLDDIR}/distfiles"}
 : ${REPODIR="${PKGBLDDIR}/repo"}
+: ${SCRIPTSDIR="${COMMONDIR}/Scripts"}
 
 : ${PREFIX="/usr"}
 : ${BINDIR="${PREFIX}/bin"}
@@ -223,12 +224,11 @@ __depends() {
     for _depend in $_depends; do
 	echo "=> ${PKGNAME} depends on ${_depend}..."
 	(
-	    _cookie=$(echo "/tmp/pkgbld/depends/${_depend}.done" | tr '/' '.')
-	    mkdir -p `dirname $_cookie`
-	    [ -f "$_cookie" ] && continue
-	    cd ${PKGBLDDIR}/${_depend}
-	    ./build package clean install DEPS=yes
-	    touch $_cookie
+	    d=`${SCRIPTSDIR}/pkg_list / "$_depend"`
+	    if [ -z "$d" ]; then
+		cd ${PKGBLDDIR}/${_depend}
+		./build package clean install DEPS=yes
+	    fi
 	) || return 1
     done
     return 0
@@ -308,19 +308,9 @@ __package() {
 	cd $WRKSRC
 	package || return 1
     )
-    # [ -d "${REPODIR}/All/${PKGNAME}" ] || mkdir -p ${REPODIR}/All/${PKGNAME}
-    [ -d "$REPODIR" ] || mkdir -p $REPODIR
-    [ -d "${WRKDST}/meta" ] || mkdir -p ${WRKDST}/meta
-    (cd $WRKDST && find . | grep -v '^\./meta' | sort) > ${WRKDST}/meta/CONTENT
-    echo "PKGNAME=$PKGNAME
-PKGVERSION=$PKGVERSION
-PKGREVISION=${PKGREVISION:-0}
-PKGEPOCH=${PKGEPOCH:-0}
-
-CATEGORIES=\"$CATEGORIES\"
-
-DESCRIPTION=\"$DESCRIPTION\"" > ${WRKDST}/meta/MANIFEST
-    tar -zcf ${REPODIR}/${PKGFILE} --options gzip:9 -C ${WRKDST} .
+    ${SCRIPTSDIR}/pkg_create REPO="$REPO" PKGNAME="$PKGNAME" \
+	PKGVERSION="$PKGVERSION" PKGREVISION="$PKGREVISION" \
+	PKGEPOCH="$PKGEPOCH" ROOT="$WRKDST"
     touch ${WRKDIR}/.__package_done
     return 0
 }
@@ -368,9 +358,7 @@ __install() {
     (
 	__depends runtime
     ) || return 1
-    tar -xf ${REPODIR}/${PKGFILE} -C /
-    [ -d "/var/pkg" ] || mkdir -p /var/pkg
-    mv /meta /var/pkg/$PKGNAME
+    ${SCRIPTSDIR}/pkg_add "${REPO}/${PKGFILE}" /
     return 0
 }
 
