@@ -1,0 +1,29 @@
+#!/bin/sh -
+# 
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+# 
+
+main() {
+    PKGNAME="$1"
+    ROOT="${2:-/}"
+
+    cd $ROOT
+    echo "===> Removing ${PKGNAME}..."
+    while read file; do
+	if [ -d "$file" ]; then
+	    DIRS="$DIRS $file"
+	    continue
+	fi
+	rm -f $file
+    done < ./var/pkg/${PKGNAME}/CONTENT
+    for dir in $DIRS; do
+	rmdir $dir || :
+    done
+    rm -rf ./var/pkg/${PKGNAME}
+    echo "=> DONE!"
+}
+
+set -e
+
+main "$*"
