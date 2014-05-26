@@ -1,0 +1,33 @@
+#!/bin/sh -
+# 
+# Copyright (c) 2014, Quentin Schwerkolt
+# All rights reserved.
+# 
+
+main() {
+    cd "$ROOT"
+    TMPPLIST="/tmp/CONTENT-${PKGNAME}-${PKGVERSION}"
+    echo "===> Generating file list..."
+    find . | sort > $TMPPLIST
+    mkdir ./meta
+    mv $TMPPLIST ./meta/CONTENT
+    echo "===> Writting manifest..."
+    echo "PKGNAME=$PKGNAME"		  > ./meta/MANIFEST
+    echo "PKGVERSION=$PKGVERSION"	 >> ./meta/MANIFEST
+    echo "PKGREVISION=${PKGREVISION:-0}" >> ./meta/MANIFEST
+    echo "PKGEPOCH=${PKGEPOCH:-0}"	 >> ./meta/MANIFEST
+    echo "===> Building package archive..."
+    FILENAME="${PKGNAME}-${PKGEPOCH:-0}:${PKGVERSION}:${PKGREVISION:-0}.tar"
+    tar -cf ${REPO}/${FILENAME} .
+    echo "===> Compressing package..."
+    gzip -9 ${REPO}/${FILENAME}
+    echo "=> Package built at ${REPO}/${FILENAME}"
+    echo "=> DONE!"
+}
+
+set -e
+
+for var in $*; do
+    eval "$var"
+done
+main "$*"
