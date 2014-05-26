@@ -46,39 +46,6 @@
 : ${FETCH="/usr/bin/fetch"}
 : ${FETCH_ARGS="-Fpr"}
 
-# __checksum() {
-#     _algo=${ARCHIVE_HASH%:*}
-#     _expected=${ARCHIVE_HASH#*:}
-#     [ -z "$_algo" -o -z "$_expected" ] && return 0
-#     _real=`$_algo -q $ARCHIVE`
-#     [ "$_expected" != "$_real" ] && return 1
-#     return 0
-# }
-
-# __download() {
-#     _dcookie="${WRKDIR}/.__download_done"
-
-#     [ -f "$_dcookie" ]		&& return 0
-#     [ "$NO_DOWNLOAD" = "yes" ]	&& return 0
-#     [ -d "$WRKDIR" ]		|| $MKDIR $WRKDIR
-#     [ -d "$DISTDIR" ]		|| $MKDIR $DISTDIR
-
-#     (
-# 	cd $DISTDIR
-# 	_tries=5
-# 	([ -r $ARCHIVE ] && __checksum) && _status="ok"
-# 	while [ $_tries -gt 0 -a -z "$_status" ]; do
-# 	    ${FETCH} ${FETCH_ARGS} -o ${ARCHIVE} ${ARCHIVE_URL}/${ARCHIVE} || :
-# 	    ([ -r $ARCHIVE ] && __checksum) && _status="ok"
-# 	    _tries=$(($_tries - 1))
-# 	done
-# 	[ -z "$_status" ] && rm -f $ARCHIVE
-#     )
-
-#     $TOUCH $_dcookie
-#     return 0
-# }
-
 __download() {
     _dcookie="${WRKDIR}/.__download_done"
 
@@ -336,6 +303,7 @@ __package() {
     __build || return 1
     [ -f "${WRKDIR}/.__package_done" ] && return 0
     [ -d "$WRKDST" ] || mkdir -p $WRKDST
+    echo "===> Creating package for ${PKGNAME}..."
     (
 	cd $WRKSRC
 	package || return 1
@@ -386,6 +354,7 @@ EOF
 }
 
 __clean() {
+    echo "===> Cleanning for ${PKGNAME}..."
     rm -rf $WRKDIR
 }
 
